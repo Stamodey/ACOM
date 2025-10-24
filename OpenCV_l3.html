@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Гауссово размытие</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .controls {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: #27ae60;
+        }
+
+        .btn-primary:hover {
+            background: #219a52;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .preview {
+            text-align: center;
+        }
+
+        .image-container {
+            position: relative;
+            margin-bottom: 20px;
+            border: 3px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #f8f9fa;
+        }
+
+        canvas {
+            max-width: 100%;
+            display: block;
+        }
+
+        .kernel-display {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .kernel-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 5px;
+        }
+
+        .kernel-cell {
+            width: 60px;
+            text-align: center;
+            padding: 5px;
+            border: 1px solid #dee2e6;
+            margin: 0 2px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .comparison {
+            grid-column: 1 / -1;
+            margin-top: 20px;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .comparison-item {
+            text-align: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .comparison-item h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .comparison-canvas {
+            width: 100%;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+        }
+
+        .opencv-comparison {
+            grid-column: 1 / -1;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 3px solid #e9ecef;
+        }
+
+        .opencv-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .method-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .badge-manual {
+            background: #3498db;
+            color: white;
+        }
+
+        .badge-opencv {
+            background: #e74c3c;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            header {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Гауссово размытие</h1>
+            <div class="subtitle">Выбор языка был сделан после убийства Будущего консорта Радана</div>
+            <h6>P.S.(13 траев, 69 лвл, броня ронина без нагрудника, оружие меч ночи +7)</h6>
+            <div class="subtitle">Да здравствует ВЕЛИКИЙ JS</div>
+        </header>
+
+        <div class="content">
+            <div class="controls">
+                <div class="control-group">
+                    <h2>Загрузка изображения</h2>
+                    <input type="file" id="imageInput" accept="image/*" style="margin-bottom: 15px;">
+                    <button onclick="createTestImage()" class="btn-primary">Создать тестовое изображение</button>
+                </div>
+
+                <div class="control-group">
+                    <h2>Параметры фильтра</h2>
+                    
+                    <label for="kernelSize">Размер ядра:</label>
+                    <input type="range" id="kernelSize" min="3" max="15" step="2" value="5">
+                    <div class="value-display">
+                        <span>3x3</span>
+                        <span id="kernelSizeValue">5x5</span>
+                        <span>15x15</span>
+                    </div>
+
+                    <label for="sigma">Сигма (σ):</label>
+                    <input type="range" id="sigma" min="0.1" max="5" step="0.1" value="1.5">
+                    <div class="value-display">
+                        <span>0.1</span>
+                        <span id="sigmaValue">1.5</span>
+                        <span>5.0</span>
+                    </div>
+
+                    <button onclick="applyGaussianFilter()" class="btn-primary">Применить ручной фильтр</button>
+                    <button onclick="applyOpenCVFilter()" class="btn-primary">Применить аналог OpenCV</button>
+                    <button onclick="resetImage()" class="btn-danger">Сбросить изображение</button>
+                </div>
+
+                <div class="control-group">
+                    <h2>Матрица Гаусса</h2>
+                    <div id="kernelDisplay" class="kernel-display">
+                        <div style="text-align: center; color: #6c757d;">Загрузите изображение и примените фильтр</div>
+                    </div>
+                </div>
+
+                <div id="status" class="status" style="display: none;"></div>
+            </div>
+
+            <div class="preview">
+                <h2>Предпросмотр</h2>
+                <div class="image-container">
+                    <canvas id="originalCanvas"></canvas>
+                </div>
+                <div class="image-container">
+                    <canvas id="filteredCanvas"></canvas>
+                </div>
+                <div class="value-display">
+                    <span><strong>Оригинал</strong></span>
+                    <span><strong id="filteredTitle">Результат фильтра</strong></span>
+                </div>
+            </div>
+
+            <div class="comparison">
+                <h2>Задание 4: Сравнение параметров</h2>
+                <p>Применение фильтра для разных размеров ядра и значений σ</p>
+                <button onclick="runComparison()" class="btn-primary">Запустить сравнение параметров</button>
+                <div id="comparisonResults" class="comparison-grid"></div>
+            </div>
+
+            <div class="opencv-comparison">
+                <h2>Задание 5: Сравнение с аналогом OpenCV</h2>
+                <p>Сравнение ручной реализации и аналога OpenCV фильтра</p>
+                <button onclick="runOpenCVComparison()" class="btn-primary">Запустить сравнение с OpenCV</button>
+                <div id="opencvResults" class="opencv-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+class GaussianFilter {
+    constructor() {
+        this.originalImage = null;
+        this.originalCanvas = document.getElementById('originalCanvas');
+        this.filteredCanvas = document.getElementById('filteredCanvas');
+        this.originalCtx = this.originalCanvas.getContext('2d');
+        this.filteredCtx = this.filteredCanvas.getContext('2d');
+        this.currentMethod = 'manual';
+        
+        this.initializeEventListeners();
+    }
+
+    initializeEventListeners() {
+        document.getElementById('imageInput').addEventListener('change', (e) => {
+            this.loadImage(e.target.files[0]);
+        });
+
+        document.getElementById('kernelSize').addEventListener('input', (e) => {
+            document.getElementById('kernelSizeValue').textContent = `${e.target.value}x${e.target.value}`;
+        });
+
+        document.getElementById('sigma').addEventListener('input', (e) => {
+            document.getElementById('sigmaValue').textContent = e.target.value;
+        });
+    }
+
+    loadImage(file) {
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                this.originalImage = img;
+                this.displayImage(img, this.originalCanvas);
+                this.displayImage(img, this.filteredCanvas);
+                this.showStatus('Изображение загружено успешно!', 'success');
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    displayImage(img, canvas) {
+        const maxWidth = 400;
+        const maxHeight = 300;
+        
+        let { width, height } = img;
+        
+        if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width *= ratio;
+            height *= ratio;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+    }
+
+    createGaussianKernel(size, sigma) {
+        console.log(`Создание матрицы Гаусса ${size}x${size}, σ=${sigma}`);
+        
+        const kernel = Array(size).fill().map(() => Array(size).fill(0));
+        const center = Math.floor(size / 2);
+        let sum = 0;
+
+        // Формула Гаусса как в OpenCV
+        const sigma2 = 2 * sigma * sigma;
+        const constant = 1 / (Math.PI * sigma2);
+
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                const x = i - center;
+                const y = j - center;
+                const value = constant * Math.exp(-(x * x + y * y) / sigma2);
+                kernel[i][j] = value;
+                sum += value;
+            }
+        }
+
+        // Нормализация
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                kernel[i][j] /= sum;
+            }
+        }
+
+        return kernel;
+    }
+
+    applyGaussianFilterManual(imageData, kernel) {
+        const width = imageData.width;
+        const height = imageData.height;
+        const data = imageData.data;
+        const output = new ImageData(width, height);
+        const kernelSize = kernel.length;
+        const kernelHalf = Math.floor(kernelSize / 2);
+
+        // Создаем копию оригинальных данных
+        const tempData = new Uint8ClampedArray(data);
+        
+        // Обрабатываем только внутренние пиксели
+        for (let y = kernelHalf; y < height - kernelHalf; y++) {
+            for (let x = kernelHalf; x < width - kernelHalf; x++) {
+                let r = 0, g = 0, b = 0;
+
+                // Применяем свертку
+                for (let ky = 0; ky < kernelSize; ky++) {
+                    for (let kx = 0; kx < kernelSize; kx++) {
+                        const pixelX = x + kx - kernelHalf;
+                        const pixelY = y + ky - kernelHalf;
+                        const pixelIndex = (pixelY * width + pixelX) * 4;
+                        const weight = kernel[ky][kx];
+
+                        r += tempData[pixelIndex] * weight;
+                        g += tempData[pixelIndex + 1] * weight;
+                        b += tempData[pixelIndex + 2] * weight;
+                    }
+                }
+
+                const outputIndex = (y * width + x) * 4;
+                output.data[outputIndex] = Math.max(0, Math.min(255, Math.round(r)));
+                output.data[outputIndex + 1] = Math.max(0, Math.min(255, Math.round(g)));
+                output.data[outputIndex + 2] = Math.max(0, Math.min(255, Math.round(b)));
+                output.data[outputIndex + 3] = tempData[outputIndex + 3]; // Сохраняем альфа-канал
+            }
+        }
+
+        // Заполняем границы оригинальными значениями
+        for (let i = 0; i < data.length; i += 4) {
+            const x = (i / 4) % width;
+            const y = Math.floor((i / 4) / width);
+            
+            if (x < kernelHalf || x >= width - kernelHalf || 
+                y < kernelHalf || y >= height - kernelHalf) {
+                output.data[i] = tempData[i];
+                output.data[i + 1] = tempData[i + 1];
+                output.data[i + 2] = tempData[i + 2];
+                output.data[i + 3] = tempData[i + 3];
+            }
+        }
+
+        return output;
+    }
+
+
+    applyOpenCVStyleFilter(imageData, kernel) {
+        const width = imageData.width;
+        const height = imageData.height;
+        const data = imageData.data;
+        const output = new ImageData(width, height);
+        const kernelSize = kernel.length;
+        const kernelHalf = Math.floor(kernelSize / 2);
+
+        // Копируем оригинальные данные для выходного изображения
+        for (let i = 0; i < data.length; i++) {
+            output.data[i] = data[i];
+        }
+
+        // Создаем отдельные ядра для горизонтальной и вертикальной свертки
+        const horizontalKernel = kernel[kernelHalf]; // Центральная строка
+        const verticalKernel = kernel.map(row => row[kernelHalf]); // Центральный столбец
+
+        // Временный буфер для результатов горизонтальной свертки
+        const tempBuffer = new Float32Array(width * height * 4);
+
+        // 1. Горизонтальная свертка
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let r = 0, g = 0, b = 0;
+                let weightSum = 0;
+
+                for (let kx = 0; kx < kernelSize; kx++) {
+                    const pixelX = x + kx - kernelHalf;
+                    
+                    if (pixelX >= 0 && pixelX < width) {
+                        const pixelIndex = (y * width + pixelX) * 4;
+                        const weight = horizontalKernel[kx];
+                        
+                        r += data[pixelIndex] * weight;
+                        g += data[pixelIndex + 1] * weight;
+                        b += data[pixelIndex + 2] * weight;
+                        weightSum += weight;
+                    }
+                }
+
+                // Нормализуем и сохраняем во временный буфер
+                const tempIndex = (y * width + x) * 4;
+                if (weightSum > 0) {
+                    tempBuffer[tempIndex] = r / weightSum;
+                    tempBuffer[tempIndex + 1] = g / weightSum;
+                    tempBuffer[tempIndex + 2] = b / weightSum;
+                    tempBuffer[tempIndex + 3] = data[tempIndex + 3]; // Сохраняем альфа
+                } else {
+                    // Если веса нет, используем оригинальные значения
+                    const origIndex = (y * width + x) * 4;
+                    tempBuffer[tempIndex] = data[origIndex];
+                    tempBuffer[tempIndex + 1] = data[origIndex + 1];
+                    tempBuffer[tempIndex + 2] = data[origIndex + 2];
+                    tempBuffer[tempIndex + 3] = data[origIndex + 3];
+                }
+            }
+        }
+
+        // 2. Вертикальная свертка
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let r = 0, g = 0, b = 0;
+                let weightSum = 0;
+
+                for (let ky = 0; ky < kernelSize; ky++) {
+                    const pixelY = y + ky - kernelHalf;
+                    
+                    if (pixelY >= 0 && pixelY < height) {
+                        const tempIndex = (pixelY * width + x) * 4;
+                        const weight = verticalKernel[ky];
+                        
+                        r += tempBuffer[tempIndex] * weight;
+                        g += tempBuffer[tempIndex + 1] * weight;
+                        b += tempBuffer[tempIndex + 2] * weight;
+                        weightSum += weight;
+                    }
+                }
+
+                const outputIndex = (y * width + x) * 4;
+                if (weightSum > 0) {
+                    output.data[outputIndex] = Math.max(0, Math.min(255, Math.round(r / weightSum)));
+                    output.data[outputIndex + 1] = Math.max(0, Math.min(255, Math.round(g / weightSum)));
+                    output.data[outputIndex + 2] = Math.max(0, Math.min(255, Math.round(b / weightSum)));
+                    // Альфа-канал сохраняем оригинальный
+                }
+                // Если weightSum == 0, оставляем оригинальные значения
+            }
+        }
+
+        return output;
+    }
+
+    displayKernel(kernel, method = 'manual') {
+        const container = document.getElementById('kernelDisplay');
+        container.innerHTML = '';
+
+        const methodTitle = document.createElement('div');
+        methodTitle.style.textAlign = 'center';
+        methodTitle.style.fontWeight = 'bold';
+        methodTitle.style.marginBottom = '10px';
+        methodTitle.textContent = method === 'manual' ? 'Ручная реализация' : 'Аналог OpenCV';
+        methodTitle.style.color = method === 'manual' ? '#3498db' : '#e74c3c';
+        container.appendChild(methodTitle);
+
+        kernel.forEach(row => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'kernel-row';
+            
+            row.forEach(cell => {
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'kernel-cell';
+                cellDiv.textContent = cell.toFixed(6);
+                rowDiv.appendChild(cellDiv);
+            });
+            
+            container.appendChild(rowDiv);
+        });
+
+        const sum = kernel.flat().reduce((acc, val) => acc + val, 0);
+        const sumDiv = document.createElement('div');
+        sumDiv.style.marginTop = '10px';
+        sumDiv.style.textAlign = 'center';
+        sumDiv.style.fontWeight = 'bold';
+        sumDiv.textContent = `Сумма: ${sum.toFixed(8)}`;
+        sumDiv.style.color = Math.abs(sum - 1) < 0.0001 ? '#27ae60' : '#e74c3c';
+        container.appendChild(sumDiv);
+    }
+
+    applyGaussianFilter() {
+        if (!this.originalImage) {
+            this.showStatus('Сначала загрузите изображение!', 'error');
+            return;
+        }
+
+        this.currentMethod = 'manual';
+        document.getElementById('filteredTitle').innerHTML = '<strong>Ручная реализация</strong>';
+
+        const kernelSize = parseInt(document.getElementById('kernelSize').value);
+        const sigma = parseFloat(document.getElementById('sigma').value);
+
+        const startTime = performance.now();
+        
+        const kernel = this.createGaussianKernel(kernelSize, sigma);
+        this.displayKernel(kernel, 'manual');
+
+        const imageData = this.originalCtx.getImageData(0, 0, this.originalCanvas.width, this.originalCanvas.height);
+        const filteredData = this.applyGaussianFilterManual(imageData, kernel);
+        
+        this.filteredCtx.putImageData(filteredData, 0, 0);
+        
+        const endTime = performance.now();
+        const duration = (endTime - startTime).toFixed(2);
+        
+        this.showStatus(`Ручной фильтр применен за ${duration}мс! Ядро: ${kernelSize}x${kernelSize}, σ: ${sigma}`, 'success');
+    }
+
+    applyOpenCVFilter() {
+        if (!this.originalImage) {
+            this.showStatus('Сначала загрузите изображение!', 'error');
+            return;
+        }
+
+        this.currentMethod = 'opencv';
+        document.getElementById('filteredTitle').innerHTML = '<strong>Аналог OpenCV</strong>';
+
+        const kernelSize = parseInt(document.getElementById('kernelSize').value);
+        const sigma = parseFloat(document.getElementById('sigma').value);
+
+        const startTime = performance.now();
+        
+        const kernel = this.createGaussianKernel(kernelSize, sigma);
+        this.displayKernel(kernel, 'opencv');
+
+        const imageData = this.originalCtx.getImageData(0, 0, this.originalCanvas.width, this.originalCanvas.height);
+        const filteredData = this.applyOpenCVStyleFilter(imageData, kernel);
+        
+        this.filteredCtx.putImageData(filteredData, 0, 0);
+        
+        const endTime = performance.now();
+        const duration = (endTime - startTime).toFixed(2);
+        
+        this.showStatus(`Аналог OpenCV применен за ${duration}мс! Ядро: ${kernelSize}x${kernelSize}, σ: ${sigma}`, 'success');
+    }
+
+    createTestImage() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 300;
+        const ctx = canvas.getContext('2d');
+
+        // Создаем яркое тестовое изображение
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Яркие цвета
+        ctx.fillStyle = '#ff4444';
+        ctx.fillRect(50, 50, 100, 80);
+
+        ctx.fillStyle = '#44ff44';
+        ctx.beginPath();
+        ctx.arc(200, 150, 50, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = '#4444ff';
+        ctx.fillRect(280, 80, 80, 120);
+
+        // Текст
+        ctx.fillStyle = '#000000';
+        ctx.font = '20px Arial';
+        ctx.fillText('Тест размытия', 120, 250);
+
+        const img = new Image();
+        img.onload = () => {
+            this.originalImage = img;
+            this.displayImage(img, this.originalCanvas);
+            this.displayImage(img, this.filteredCanvas);
+            this.showStatus('Тестовое изображение создано!', 'success');
+        };
+        img.src = canvas.toDataURL();
+    }
+
+    runComparison() {
+        if (!this.originalImage) {
+            this.showStatus('Сначала загрузите изображение!', 'error');
+            return;
+        }
+
+        const resultsContainer = document.getElementById('comparisonResults');
+        resultsContainer.innerHTML = '<div style="text-align:center; grid-column:1/-1;">Выполняется сравнение...</div>';
+
+        const testCases = [
+            { size: 3, sigma: 0.5, name: '3x3 σ=0.5' },
+            { size: 3, sigma: 1.5, name: '3x3 σ=1.5' },
+            { size: 5, sigma: 0.8, name: '5x5 σ=0.8' },
+            { size: 5, sigma: 2.0, name: '5x5 σ=2.0' },
+            { size: 7, sigma: 1.0, name: '7x7 σ=1.0' },
+            { size: 7, sigma: 3.0, name: '7x7 σ=3.0' }
+        ];
+
+        const originalImageData = this.originalCtx.getImageData(0, 0, this.originalCanvas.width, this.originalCanvas.height);
+
+        setTimeout(() => {
+            resultsContainer.innerHTML = '';
+            
+            testCases.forEach((testCase, index) => {
+                setTimeout(() => {
+                    const kernel = this.createGaussianKernel(testCase.size, testCase.sigma);
+                    const filteredData = this.applyGaussianFilterManual(originalImageData, kernel);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = this.originalCanvas.width;
+                    canvas.height = this.originalCanvas.height;
+                    canvas.className = 'comparison-canvas';
+                    const ctx = canvas.getContext('2d');
+                    ctx.putImageData(filteredData, 0, 0);
+
+                    const item = document.createElement('div');
+                    item.className = 'comparison-item';
+                    item.innerHTML = `
+                        <h4>${testCase.name}</h4>
+                        <div>Ядро: ${testCase.size}x${testCase.size}</div>
+                        <div>σ: ${testCase.sigma}</div>
+                    `;
+                    item.appendChild(canvas);
+
+                    resultsContainer.appendChild(item);
+                }, index * 100);
+            });
+        }, 100);
+
+        this.showStatus('Сравнение параметров завершено!', 'success');
+    }
+
+    runOpenCVComparison() {
+        if (!this.originalImage) {
+            this.showStatus('Сначала загрузите изображение!', 'error');
+            return;
+        }
+
+        const resultsContainer = document.getElementById('opencvResults');
+        resultsContainer.innerHTML = '<div style="text-align:center; grid-column:1/-1;">Выполняется сравнение с OpenCV...</div>';
+
+        const testCases = [
+            { size: 3, sigma: 1.0, name: 'Малое ядро' },
+            { size: 7, sigma: 2.0, name: 'Большое ядро' }
+        ];
+
+        const originalImageData = this.originalCtx.getImageData(0, 0, this.originalCanvas.width, this.originalCanvas.height);
+
+        setTimeout(() => {
+            resultsContainer.innerHTML = '';
+            
+            testCases.forEach((testCase, index) => {
+                const kernel = this.createGaussianKernel(testCase.size, testCase.sigma);
+
+                const manualStart = performance.now();
+                const manualData = this.applyGaussianFilterManual(originalImageData, kernel);
+                const manualTime = performance.now() - manualStart;
+
+                const opencvStart = performance.now();
+                const opencvData = this.applyOpenCVStyleFilter(originalImageData, kernel);
+                const opencvTime = performance.now() - opencvStart;
+
+                const manualItem = this.createComparisonItem(
+                    manualData, 
+                    `Ручной: ${testCase.size}x${testCase.size}`, 
+                    `σ=${testCase.sigma}<br>Время: ${manualTime.toFixed(2)}мс`,
+                    'manual'
+                );
+
+                const opencvItem = this.createComparisonItem(
+                    opencvData, 
+                    `Аналог OpenCV: ${testCase.size}x${testCase.size}`, 
+                    `σ=${testCase.sigma}<br>Время: ${opencvTime.toFixed(2)}мс`,
+                    'opencv'
+                );
+
+                resultsContainer.appendChild(manualItem);
+                resultsContainer.appendChild(opencvItem);
+            });
+
+            const originalItem = document.createElement('div');
+            originalItem.className = 'comparison-item';
+            originalItem.innerHTML = `
+                <h4>Оригинал</h4>
+                <div>Исходное изображение</div>
+            `;
+            const originalCanvas = document.createElement('canvas');
+            originalCanvas.width = this.originalCanvas.width;
+            originalCanvas.height = this.originalCanvas.height;
+            originalCanvas.className = 'comparison-canvas';
+            originalCanvas.getContext('2d').drawImage(this.originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
+            originalItem.appendChild(originalCanvas);
+            resultsContainer.appendChild(originalItem);
+
+        }, 100);
+
+        this.showStatus('Сравнение с OpenCV завершено!', 'success');
+    }
+
+    createComparisonItem(imageData, title, info, method) {
+        const item = document.createElement('div');
+        item.className = 'comparison-item';
+        
+        const badge = document.createElement('div');
+        badge.className = `method-badge badge-${method}`;
+        badge.textContent = method === 'manual' ? 'Ручная реализация' : 'Аналог OpenCV';
+        
+        item.innerHTML = `
+            <h4>${title}</h4>
+            <div>${info}</div>
+        `;
+        item.insertBefore(badge, item.firstChild);
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = this.originalCanvas.width;
+        canvas.height = this.originalCanvas.height;
+        canvas.className = 'comparison-canvas';
+        const ctx = canvas.getContext('2d');
+        ctx.putImageData(imageData, 0, 0);
+        item.appendChild(canvas);
+        
+        return item;
+    }
+
+    resetImage() {
+        if (this.originalImage) {
+            this.displayImage(this.originalImage, this.filteredCanvas);
+            this.showStatus('Изображение сброшено к оригиналу!', 'success');
+        }
+    }
+
+    showStatus(message, type) {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = `status ${type}`;
+        status.style.display = 'block';
+
+        setTimeout(() => {
+            status.style.display = 'none';
+        }, 5000);
+    }
+}
+
+let gaussianFilter;
+document.addEventListener('DOMContentLoaded', () => {
+    gaussianFilter = new GaussianFilter();
+});
+
+function applyGaussianFilter() {
+    gaussianFilter.applyGaussianFilter();
+}
+
+function applyOpenCVFilter() {
+    gaussianFilter.applyOpenCVFilter();
+}
+
+function createTestImage() {
+    gaussianFilter.createTestImage();
+}
+
+function resetImage() {
+    gaussianFilter.resetImage();
+}
+
+function runComparison() {
+    gaussianFilter.runComparison();
+}
+
+function runOpenCVComparison() {
+    gaussianFilter.runOpenCVComparison();
+}
+    </script>
+</body>
+</html>
